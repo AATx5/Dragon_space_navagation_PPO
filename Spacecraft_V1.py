@@ -1,6 +1,4 @@
-from operator import pos
 import os
-from turtle import distance
 
 import numpy as np
 import mujoco
@@ -159,9 +157,8 @@ class SpacecraftEnv(MujocoEnv, utils.EzPickle):
 
             #termanation condition: the episode ends when the ship drifts too far away from the target
             pos = self.data.qpos[0:3]
-            terminated = bool(np.any(np.abs(pos) > self.target_bound + 10.0))
-            if not terminated:
-                terminated = distance > self.max_stray_distance
+            terminated = bool(np.any(np.abs(pos) > self.target_bound + 5.0))
+            
             if terminated:
                 reward -= self.termination_penalty
 
