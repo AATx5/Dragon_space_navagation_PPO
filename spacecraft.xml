@@ -1,0 +1,114 @@
+<mujoco model="spacecraft">
+  <!--
+    Dragon-style capsule in zero gravity.  Body x axis = nose (forward), z = up, y = left.
+    Shape: a cone-shaped capsule (wide base at the back, narrow nose) plus a round trunk behind it.
+
+    Actuators (9, each takes 0..1 of its max thrust, thrusters can only push):
+      main               20 N   rear of trunk, pushes the ship forward (+x)
+
+      Pitch and yaw (radial nose thrusters, push straight sideways):
+      rcs_top             2 N   top    (+z), fires down  -> pitch nose DOWN
+      rcs_bottom          2 N   bottom (-z), fires up    -> pitch nose UP
+      rcs_left            2 N   left   (+y), fires right -> yaw nose RIGHT
+      rcs_right           2 N   right  (-y), fires left  -> yaw nose LEFT
+
+      Roll (tangential nose thrusters, push around the ring). Fire each pair together:
+      rcs_roll_pos_a/b    2 N   -> roll POSITIVE (about +x, right-hand rule)
+      rcs_roll_neg_a/b    2 N   -> roll NEGATIVE
+
+    A <motor> on a site pushes along the site's z axis, so each site's zaxis is the
+    direction that thruster pushes the SHIP (exhaust goes the opposite way).
+
+    target: a mocap body (a red sphere) with no physics. The environment moves it by
+    writing data.mocap_pos[0] each step. Sensor "target_in_ship" reports where it is
+    relative to the ship, in the ship's own frame.
+  -->
+  <option gravity="0 0 0" timestep="0.005"/>
+  <statistic center="0 0 0" extent="3"/>
+
+  <visual>
+    <headlight ambient="0.4 0.4 0.4" diffuse="0.8 0.8 0.8" specular="0 0 0"/>
+    <global offwidth="1280" offheight="720"/>
+  </visual>
+
+  <asset>
+    <material name="hull" rgba="0.88 0.89 0.92 1"/>
+    <material name="shield" rgba="0.2 0.2 0.22 1"/>
+    <material name="nozzle" rgba="0.25 0.25 0.28 1"/>
+    <material name="rcs" rgba="0.95 0.55 0.1 1"/>
+    <material name="marker" rgba="0.3 0.6 0.9 1"/>
+    <material name="target" rgba="1 0.15 0.15 0.85"/>
+    <mesh name="capsule_cone"
+          vertex="-0.25 0.35 0.0 -0.25 0.3031 0.175 -0.25 0.175 0.3031 -0.25 0.0 0.35 -0.25 -0.175 0.3031 -0.25 -0.3031 0.175 -0.25 -0.35 0.0 -0.25 -0.3031 -0.175 -0.25 -0.175 -0.3031 -0.25 -0.0 -0.35 -0.25 0.175 -0.3031 -0.25 0.3031 -0.175 0.2 0.12 0.0 0.2 0.1039 0.06 0.2 0.06 0.1039 0.2 0.0 0.12 0.2 -0.06 0.1039 0.2 -0.1039 0.06 0.2 -0.12 0.0 0.2 -0.1039 -0.06 0.2 -0.06 -0.1039 0.2 -0.0 -0.12 0.2 0.06 -0.1039 0.2 0.1039 -0.06"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 3" dir="0 0 -1" directional="true"/>
+
+    <!-- fixed markers so you can see the ship moving through empty space -->
+    <geom name="marker_x"  type="sphere" size="0.06" pos="3 0 0"  material="marker" contype="0" conaffinity="0"/>
+    <geom name="marker_y"  type="sphere" size="0.06" pos="0 3 0"  material="marker" contype="0" conaffinity="0"/>
+    <geom name="marker_z"  type="sphere" size="0.06" pos="0 0 3"  material="marker" contype="0" conaffinity="0"/>
+    <geom name="marker_nx" type="sphere" size="0.06" pos="-3 0 0" material="marker" contype="0" conaffinity="0"/>
+
+    <!-- objective point: mocap = no physics, the environment sets its position -->
+    <body name="target" mocap="true" pos="2 0 0">
+      <geom name="target_sphere" type="sphere" size="0.1" material="target" contype="0" conaffinity="0"/>
+    </body>
+
+    <body name="ship" pos="0 0 0">
+      <freejoint name="root"/>
+
+      <!-- capsule (3 kg) and trunk (2 kg) -->
+      <geom name="capsule" type="mesh" mesh="capsule_cone" mass="3" material="hull"/>
+      <geom name="trunk" type="cylinder" fromto="-0.25 0 0 -0.45 0 0" size="0.35" mass="2" material="shield"/>
+
+      <!-- visual-only parts (no mass, no collision) -->
+      <geom name="main_nozzle" type="cylinder" fromto="-0.45 0 0 -0.53 0 0" size="0.07"
+            material="nozzle" density="0" contype="0" conaffinity="0"/>
+      <geom name="rcs_top_nozzle"    type="sphere" size="0.02" pos="0.15 0 0.15"  material="rcs" density="0" contype="0" conaffinity="0"/>
+      <geom name="rcs_bottom_nozzle" type="sphere" size="0.02" pos="0.15 0 -0.15" material="rcs" density="0" contype="0" conaffinity="0"/>
+      <geom name="rcs_left_nozzle"   type="sphere" size="0.02" pos="0.15 0.15 0"  material="rcs" density="0" contype="0" conaffinity="0"/>
+      <geom name="rcs_right_nozzle"  type="sphere" size="0.02" pos="0.15 -0.15 0" material="rcs" density="0" contype="0" conaffinity="0"/>
+      <geom name="roll_pos_a_nozzle" type="sphere" size="0.02" pos="0.15 0.106 0.106"   material="rcs" density="0" contype="0" conaffinity="0"/>
+      <geom name="roll_pos_b_nozzle" type="sphere" size="0.02" pos="0.15 -0.106 -0.106" material="rcs" density="0" contype="0" conaffinity="0"/>
+      <geom name="roll_neg_a_nozzle" type="sphere" size="0.02" pos="0.15 -0.106 0.106"  material="rcs" density="0" contype="0" conaffinity="0"/>
+      <geom name="roll_neg_b_nozzle" type="sphere" size="0.02" pos="0.15 0.106 -0.106"  material="rcs" density="0" contype="0" conaffinity="0"/>
+
+      <!-- thruster sites: pos = where the force acts, zaxis = direction it pushes the ship -->
+      <site name="main_thruster" pos="-0.45 0 0" zaxis="1 0 0" size="0.02" rgba="1 0.3 0 1"/>
+
+      <site name="rcs_top"    pos="0.15 0 0.15"  zaxis="0 0 -1" size="0.015" rgba="1 0.3 0 1"/>
+      <site name="rcs_bottom" pos="0.15 0 -0.15" zaxis="0 0 1"  size="0.015" rgba="1 0.3 0 1"/>
+      <site name="rcs_left"   pos="0.15 0.15 0"  zaxis="0 -1 0" size="0.015" rgba="1 0.3 0 1"/>
+      <site name="rcs_right"  pos="0.15 -0.15 0" zaxis="0 1 0"  size="0.015" rgba="1 0.3 0 1"/>
+
+      <site name="rcs_roll_pos_a" pos="0.15 0.106 0.106"   zaxis="0 -0.7071 0.7071"  size="0.015" rgba="1 0.3 0 1"/>
+      <site name="rcs_roll_pos_b" pos="0.15 -0.106 -0.106" zaxis="0 0.7071 -0.7071"  size="0.015" rgba="1 0.3 0 1"/>
+      <site name="rcs_roll_neg_a" pos="0.15 -0.106 0.106"  zaxis="0 0.7071 0.7071"   size="0.015" rgba="1 0.3 0 1"/>
+      <site name="rcs_roll_neg_b" pos="0.15 0.106 -0.106"  zaxis="0 -0.7071 -0.7071" size="0.015" rgba="1 0.3 0 1"/>
+
+      <site name="imu" pos="0 0 0" size="0.01"/>
+    </body>
+  </worldbody>
+
+  <actuator>
+    <motor name="main"           site="main_thruster"  gear="0 0 20 0 0 0" ctrlrange="0 1"/>
+    <motor name="rcs_top"        site="rcs_top"        gear="0 0 2 0 0 0"  ctrlrange="0 1"/>
+    <motor name="rcs_bottom"     site="rcs_bottom"     gear="0 0 2 0 0 0"  ctrlrange="0 1"/>
+    <motor name="rcs_left"       site="rcs_left"       gear="0 0 2 0 0 0"  ctrlrange="0 1"/>
+    <motor name="rcs_right"      site="rcs_right"      gear="0 0 2 0 0 0"  ctrlrange="0 1"/>
+    <motor name="rcs_roll_pos_a" site="rcs_roll_pos_a" gear="0 0 2 0 0 0"  ctrlrange="0 1"/>
+    <motor name="rcs_roll_pos_b" site="rcs_roll_pos_b" gear="0 0 2 0 0 0"  ctrlrange="0 1"/>
+    <motor name="rcs_roll_neg_a" site="rcs_roll_neg_a" gear="0 0 2 0 0 0"  ctrlrange="0 1"/>
+    <motor name="rcs_roll_neg_b" site="rcs_roll_neg_b" gear="0 0 2 0 0 0"  ctrlrange="0 1"/>
+  </actuator>
+
+  <sensor>
+    <gyro name="gyro" site="imu"/>
+    <accelerometer name="accel" site="imu"/>
+    <velocimeter name="vel" site="imu"/>
+    <framequat name="quat" objtype="site" objname="imu"/>
+    <framepos name="target_in_ship" objtype="body" objname="target" reftype="site" refname="imu"/>
+  </sensor>
+</mujoco>
